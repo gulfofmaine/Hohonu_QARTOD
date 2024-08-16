@@ -1,0 +1,11 @@
+name: Hohonu_QARTOD-default-osx-arm64
+channels:
+- conda-forge
+dependencies:
+- streamlit >=1.37.1,<1.38
+- pydantic >=2.8.2,<2.9
+- pyyaml >=6.0.2,<6.1
+- ioos_qc >=2.1.0,<2.2
+- pandas >=2.2.2,<2.3
+- bokeh >=3.5.1,<3.6
+
