@@ -1197,7 +1197,14 @@ packages:
   name: hohonu-qartod
   version: 0.1.0
   path: .
-  sha256: c2e0cd6acad4f9aabc3bb82b798e90d95666805ed4854cfe1b30a8ba5edc064c
+  sha256: 612d295317307fe7ced579b57d4b346ee49fd9d97890ca2f0bbeb09c75c4b31a
+  requires_dist:
+  - streamlit
+  - pydantic
+  - pyyaml
+  - ioos-qc
+  - pandas
+  - bokeh
   requires_python: '>=3.11'
   editable: true
 - kind: conda

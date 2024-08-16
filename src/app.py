@@ -70,7 +70,7 @@ with st.sidebar:
             "Station ID",
             value="hohonu-180",
             help="""
-    To get a Hohonu station ID, find the station in the dashboard,
+    To get the station ID, find the station in the [Hohonu dashboard](https://dashboard.hohonu.io/),
     then select the segment between `map-page/` and it's name.
 
     For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
@@ -106,6 +106,10 @@ with st.sidebar:
         load_data_button = st.toggle("Load data")
 
 if not load_data_button:
+    st.warning(
+        "Please select a date range and toggle 'Load data' to generate QARTOD config."
+        ""
+    )
     st.stop()
 
 
