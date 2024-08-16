@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 import streamlit as st
+import yaml
 
 from hohonu_api import HohonuApi, DATE_FORMAT, hohonu_response_to_df
 import qc_helpers
@@ -133,19 +134,19 @@ or can be calculated using [CO-OPS Tidal Analysis Datum Calculator](https://acce
 For calculation, at least a month's worth of clean data is required.
 """)
 
-    mllw = st.number_input(
-        "Mean Low Low Water (MLLW meters)",
-        # value=station_info.mllw,
-        help="""
-        The mean low low water (MLLW) datum offset for the gauge in meters from NAVD88.
-        """,
-    )
-
     mhhw = st.number_input(
         "Mean High High Water (MHHW meters)",
         # value=station_info.mhhw,
         help="""
         The mean high high water (MHHW) datum offset for the gauge in meters from NAVD88.datum for the gauge.
+        """,
+    )
+
+    mllw = st.number_input(
+        "Mean Low Low Water (MLLW meters)",
+        # value=station_info.mllw,
+        help="""
+        The mean low low water (MLLW) datum offset for the gauge in meters from NAVD88.
         """,
     )
 
@@ -263,7 +264,7 @@ with gross_range_expander:
             )
             st.bokeh_chart(plot, use_container_width=True)
 
-            st.write(gross_df)
+            st.dataframe(gross_df)
 
 rate_of_change_expander = st.expander("Rate of change test", expanded=True)
 
@@ -292,7 +293,7 @@ May want to adjust this so it’s dependent on tidal range
             """,
         )
         rate_of_change_test_toggle = st.toggle("Enable Rate of change test", value=True)
-    
+
     with rate_col_2:
         if not rate_of_change_test_toggle:
             st.write("Rate of change test is disabled.")
@@ -312,7 +313,7 @@ May want to adjust this so it’s dependent on tidal range
                     }
                 ),
             )
-            
+
             plot = qc_helpers.plot_results(
                 rate_of_change_df,
                 "rate_of_change_test",
@@ -320,4 +321,221 @@ May want to adjust this so it’s dependent on tidal range
             )
             st.bokeh_chart(plot, use_container_width=True)
 
-            st.write(rate_of_change_df)
+            st.dataframe(rate_of_change_df)
+
+
+spike_expander = st.expander("Spike test", expanded=True)
+
+with spike_expander:
+    with st.popover("Test configuration suggestions"):
+        st.markdown("""
+### Spike test: Input as a magnitude that’s checked across a measurement and the two adjacent measurements.  
+
+Maybe default to same as rate of change test? 
+                    """)
+
+    spike_col_1, spike_col_2 = st.columns([1, 3])
+
+    with spike_col_1:
+        spike_suspect_threshold = st.number_input(
+            "Suspect threshold",
+            value=0.75 * FEET_TO_METERS,
+            format="%.3f",
+        )
+        spike_fail_threshold = st.number_input(
+            "Fail threshold",
+            value=1.5 * FEET_TO_METERS,
+            format="%.3f",
+        )
+        spike_test_toggle = st.toggle("Enable Spike test", value=True)
+
+    with spike_col_2:
+        if not spike_test_toggle:
+            st.write("Spike test is disabled.")
+        else:
+            spike_test_config = {
+                "spike_test": {
+                    "suspect_threshold": spike_suspect_threshold,
+                    "fail_threshold": spike_fail_threshold,
+                }
+            }
+            spike_df = qc_helpers.run_qc(
+                data,
+                qc_helpers.Config(
+                    {
+                        "observed": {
+                            "qartod": spike_test_config,
+                        }
+                    }
+                ),
+            )
+
+            plot = qc_helpers.plot_results(
+                spike_df,
+                "spike_test",
+                title="Spike test",
+            )
+            st.bokeh_chart(plot, use_container_width=True)
+            st.dataframe(spike_df)
+
+
+flat_line_expander = st.expander("Flat line test", expanded=True)
+
+with flat_line_expander:
+    with st.popover("Test configuration suggestions"):
+        st.markdown("""
+### Flat line test: If there’s some lack of variance over some amount of time, mark as suspect/fail 
+
+Suspect/Fail = how long do subsequent values stay within that threshold before it’s considered flat? (input as a time) 
+
+For example, if all measurements over the past 4 hours are within 10 cm of each other, fail the flatline test (then tolerance = 10 cm, and time = 4 hours) 
+
+When a sensor flatlines, the system voltage and temperature sensor may still be causing variation 
+
+Let’s start with 0.1 feet over 2 hours for suspect, and 0.1 feet over 3 hours for fail.  
+
+
+Rationale: During neap tides in Portland, you could see as little as +/- 0.25 ft per hour of variation in the 2 hours around slack tide (HW or LW)  
+                    """)
+
+    flat_line_col_1, flat_line_col_2 = st.columns([1, 3])
+
+    with flat_line_col_1:
+        flat_line_tolerance = st.number_input(
+            "Tolerance (meters)",
+            value=0.1 * FEET_TO_METERS,
+            format="%.3f",
+            help="How little change is considered flat?",
+        )
+        flat_line_suspect_threshold = st.number_input(
+            "Suspect threshold (seconds)",
+            value=2 * 60 * 60,
+        )
+        flat_line_fail_threshold = st.number_input(
+            "Fail threshold (seconds)",
+            value=3 * 60 * 60,
+        )
+        flat_line_test_toggle = st.toggle("Enable Flat line test", value=True)
+    with flat_line_col_2:
+        if not flat_line_test_toggle:
+            st.write("Flat line test is disabled.")
+        else:
+            flat_line_test_config = {
+                "flat_line_test": {
+                    "tolerance": flat_line_tolerance,
+                    "suspect_threshold": flat_line_suspect_threshold,
+                    "fail_threshold": flat_line_fail_threshold,
+                }
+            }
+            flat_line_df = qc_helpers.run_qc(
+                data,
+                qc_helpers.Config(
+                    {
+                        "observed": {
+                            "qartod": flat_line_test_config,
+                        }
+                    }
+                ),
+            )
+            plot = qc_helpers.plot_results(
+                flat_line_df,
+                "flat_line_test",
+                title="Flat line test",
+            )
+            st.bokeh_chart(plot, use_container_width=True)
+            st.dataframe(flat_line_df)
+
+
+with st.expander("Aggregated results", expanded=True):
+    qartod = {}
+
+    if gross_range_test_toggle:
+        qartod = {
+            **qartod,
+            **gross_range_test_config,
+        }
+    if rate_of_change_test_toggle:
+        qartod = {
+            **qartod,
+            **rate_of_change_test_config,
+        }
+    if spike_test_toggle:
+        qartod = {
+            **qartod,
+            **spike_test_config,
+        }
+    if flat_line_test_toggle:
+        qartod = {
+            **qartod,
+            **flat_line_test_config,
+        }
+    
+    all_df = qc_helpers.run_qc(
+        data,
+        qc_helpers.Config(
+            {
+                "observed": {
+                    "qartod": qartod,
+                }
+            }
+        ),
+    )
+    plot = qc_helpers.plot_aggregate(
+        all_df,
+    )
+    st.bokeh_chart(plot, use_container_width=True)
+    
+    st.write(qartod)
+
+    st.dataframe(all_df)
+with st.expander("Configuration"):
+    st.markdown("### NERACOOS Sea-Eagle config")
+
+    datum_col, calc_dates_col = st.columns([1, 1])
+    
+    with datum_col:
+        st.markdown("Additional datums")
+
+        datums = {
+                    "mhhw": mhhw,
+                    "mllw": mllw,
+                }
+        
+        if mhw := st.number_input("Mean High Water (m)"):
+            datums["mhw"] = mhw
+        if mtl := st.number_input("Mean Tide Level (m)"):
+            datums["mtl"] = mtl
+        if msl := st.number_input("Mean Sea Level (m)"):
+            datums["msl"] = msl
+        if mlw := st.number_input("Mean Low Water (m)"):
+            datums["mlw"] = mlw
+
+    with calc_dates_col:
+        st.markdown("If datums were calculated, provide the date of calculation, and range that they were calculated over")
+        if st.toggle("Datums manually calculated or updated", value=False):
+            if calc_date := st.date_input("Calculation date"):
+                datums["date_calculated"] = calc_date.isoformat()
+            if start_date := st.date_input("Start date"):
+                datums["calculation_start_date"] = start_date.isoformat()
+            if end_date := st.date_input("End date"):
+                datums["calculation_end_date"] = end_date.isoformat()
+
+    config = {
+        # "title": station_info.location,
+        "station_id": station_id,
+        "start_dt": station_info.installation_date.isoformat(),
+        "latitude": station_info.latitude,
+        "longitude": station_info.longitude,
+        "datums": {
+            "manual_datums": datums
+        },
+        "qc": {"qartod": {"contexts": [{"streams": {"observed": {"qartod": qartod}}}]}},
+    }
+    if summary := st.text_area("Station summary information"):
+        config["summary"] = summary
+
+    st.markdown("Station configuration to provide to ODP")
+
+    config_yaml = yaml.dump(config)
+    st.download_button("Download station config", config_yaml, file_name=f"{station_id}.yaml")
+    st.code(config_yaml, language="yaml")

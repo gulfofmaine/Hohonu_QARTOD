@@ -66,3 +66,50 @@ def plot_results(
     p1.circle(time, qc_fail, size=6, legend_label="qc fail", color="red", alpha=1.0)
 
     return gridplot([[p1]], width=800, height=400)
+
+
+def plot_aggregate(
+    data: pd.DataFrame,
+    var_name="observed",
+    aggregate_name: str = "qartod_qc_rollup",
+    title: str = None,
+):
+    """Plot the qc results on top of the source data"""
+
+    time = data["time"]
+    obs = data[var_name]
+    qc_test = data[aggregate_name]
+
+    qc_pass = np.ma.masked_where(qc_test != 1, obs)
+    qc_suspect = np.ma.masked_where(qc_test != 3, obs)
+    qc_fail = np.ma.masked_where(qc_test != 4, obs)
+    qc_notrun = np.ma.masked_where(qc_test != 2, obs)
+
+    display_title = aggregate_name
+
+    p1 = figure(x_axis_type="datetime", title=display_title)
+    p1.grid.grid_line_alpha = 0.3
+    p1.xaxis.axis_label = "Time"
+    p1.yaxis.axis_label = "Observation Value"
+
+    p1.line(time, obs, legend_label="obs", color="#A6CEE3")
+    p1.circle(
+        time,
+        qc_notrun,
+        size=2,
+        legend_label="qc not run",
+        color="gray",
+        alpha=0.2,
+    )
+    p1.circle(time, qc_pass, size=4, legend_label="qc pass", color="green", alpha=0.5)
+    p1.circle(
+        time,
+        qc_suspect,
+        size=4,
+        legend_label="qc suspect",
+        color="orange",
+        alpha=0.7,
+    )
+    p1.circle(time, qc_fail, size=6, legend_label="qc fail", color="red", alpha=1.0)
+
+    return gridplot([[p1]], width=800, height=400)
