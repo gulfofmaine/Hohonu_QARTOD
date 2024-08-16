@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 import streamlit as st
-import yaml
 
 from hohonu_api import HohonuApi, DATE_FORMAT, hohonu_response_to_df
 import qc_helpers
@@ -535,8 +534,18 @@ with st.expander("Configuration", expanded=True):
 
     st.markdown("Station configuration to provide to ODP")
 
-    config_yaml = yaml.dump(config)
-    st.download_button(
-        "Download station config", config_yaml, file_name=f"{station_id}.yaml"
-    )
-    st.code(config_yaml, language="yaml")
+    try:
+        import yaml
+        config_yaml = yaml.dump(config)
+        st.download_button(
+            "Download station config", config_yaml, file_name=f"{station_id}.yaml"
+        )
+        st.code(config_yaml, language="yaml")
+    except ImportError:
+        st.warning("Unable to install yaml for some reason, trying to just return json")
+        import json
+        config_json = json.dumps(config)
+        st.download_button(
+            "Download station config", config_json, file_name=f"{station_id}.json"
+        )
+        st.code(config_json, language="json")
