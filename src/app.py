@@ -103,7 +103,14 @@ with st.sidebar:
                 """,
         )
 
-        load_data_button = st.toggle("Load data")
+        too_long = date_range[1] - date_range[0] > timedelta(days=30)
+        if too_long:
+            st.warning(
+                "Please select a date range of less than 30 days. "
+                "This is to prevent the API from timing out."
+            )
+
+        load_data_button = st.toggle("Load data", disabled=too_long)
 
 if not load_data_button:
     st.warning(
