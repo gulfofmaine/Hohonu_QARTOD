@@ -1,0 +1,29 @@
+[project]
+name = "Hohonu_QARTOD"
+version = "0.1.0"
+description = "Add a short description here"
+authors = [{name = "Alex Kerney", email = "abk@mac.com"}]
+requires-python = ">= 3.11"
+dependencies = []
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+Hohonu_QARTOD = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+start = "streamlit run src/app.py"
+
+[tool.pixi.dependencies]
+streamlit = ">=1.37.1,<1.38"
+pydantic = ">=2.8.2,<2.9"
+pyyaml = ">=6.0.2,<6.1"
+ioos_qc = ">=2.1.0,<2.2"
+pandas = ">=2.2.2,<2.3"
+bokeh = "<3"
