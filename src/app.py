@@ -65,50 +65,45 @@ def fetch_data(station_id: str, date_range: tuple[datetime, datetime]):
 
 
 with st.sidebar:
-    station_selector = st.expander("Station Selector", expanded=True)
+    with st.expander("Station Selector", expanded=True):
+        station_id = st.text_input(
+            "Station ID",
+            value="hohonu-180",
+            help="""
+    To get a Hohonu station ID, find the station in the dashboard,
+    then select the segment between `map-page/` and it's name.
 
-with station_selector:
-    station_id = st.text_input(
-        "Station ID",
-        value="hohonu-180",
-        help="""
-To get a Hohonu station ID, find the station in the dashboard,
-then select the segment between `map-page/` and it's name.
+    For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
+    """,
+        )
 
-For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
-""",
-    )
+        station_info = load_station_info(station_id)
 
-    station_info = load_station_info(station_id)
+        st.markdown(f"""
+        {station_info.location}
 
-    st.markdown(f"""
-    {station_info.location}
-
-    - Latitude: {station_info.latitude}
-    - Longitude: {station_info.longitude}
-    - NAVD88: {station_info.navd88}
-    - Install date: {station_info.installation_date}
-    """)
+        - Latitude: {station_info.latitude}
+        - Longitude: {station_info.longitude}
+        - NAVD88: {station_info.navd88}
+        - Install date: {station_info.installation_date}
+        """)
 
 with st.sidebar:
-    data_range = st.expander("Data selector", expanded=True)
+    with st.expander("Data selector", expanded=True):
+        now = datetime.now()
+        week_ago = now - timedelta(days=7)
 
+        date_range = st.date_input(
+            "Date range",
+            (week_ago, now),
+            max_value=now,
+            min_value=station_info.installation_date,
+            help="""
+                Date range to load testing data for.
+                """,
+        )
 
-with data_range:
-    now = datetime.now()
-    week_ago = now - timedelta(days=7)
-
-    date_range = st.date_input(
-        "Date range",
-        (week_ago, now),
-        max_value=now,
-        min_value=station_info.installation_date,
-        help="""
-            Date range to load testing data for.
-            """,
-    )
-
-    load_data_button = st.toggle("Load data")
+        load_data_button = st.toggle("Load data")
 
 if not load_data_button:
     st.stop()
@@ -121,39 +116,35 @@ with st.expander("Loaded data"):
     st.line_chart(data, x="time", y="observed", y_label="NAVD88 (m)")
 
 with st.sidebar:
-    datum_selector = st.expander("Datum selector", expanded=True)
+    with st.expander("Datum selector", expanded=True):
+        st.markdown("""
+                    
+    Datums should be entered as offsets from NAVD88.
 
-with datum_selector:
-    st.markdown("""
-                
-Datums should be entered as offsets from NAVD88.
+    They can either be entered from known values,
+    or can be calculated using [CO-OPS Tidal Analysis Datum Calculator](https://access.co-ops.nos.noaa.gov/datumcalc/).
+                    
+    For calculation, at least a month's worth of clean data is required.
+    """)
 
-They can either be entered from known values,
-or can be calculated using [CO-OPS Tidal Analysis Datum Calculator](https://access.co-ops.nos.noaa.gov/datumcalc/).
-                
-For calculation, at least a month's worth of clean data is required.
-""")
+        mhhw = st.number_input(
+            "Mean High High Water (MHHW meters)",
+            # value=station_info.mhhw,
+            help="""
+            The mean high high water (MHHW) datum offset for the gauge in meters from NAVD88.datum for the gauge.
+            """,
+        )
 
-    mhhw = st.number_input(
-        "Mean High High Water (MHHW meters)",
-        # value=station_info.mhhw,
-        help="""
-        The mean high high water (MHHW) datum offset for the gauge in meters from NAVD88.datum for the gauge.
-        """,
-    )
-
-    mllw = st.number_input(
-        "Mean Low Low Water (MLLW meters)",
-        # value=station_info.mllw,
-        help="""
-        The mean low low water (MLLW) datum offset for the gauge in meters from NAVD88.
-        """,
-    )
+        mllw = st.number_input(
+            "Mean Low Low Water (MLLW meters)",
+            # value=station_info.mllw,
+            help="""
+            The mean low low water (MLLW) datum offset for the gauge in meters from NAVD88.
+            """,
+        )
 
 
-gross_range_expander = st.expander("Gross range test", expanded=True)
-
-with gross_range_expander:
+with st.expander("Gross range test", expanded=True):
     with st.popover("Test configuration suggestions"):
         st.markdown("""
         ### Gross range test configuration for Gulf of Maine (not New England Shelf)
@@ -264,11 +255,10 @@ with gross_range_expander:
             )
             st.bokeh_chart(plot, use_container_width=True)
 
-            st.dataframe(gross_df)
+            with st.popover("Tabular results"):
+                st.dataframe(gross_df)
 
-rate_of_change_expander = st.expander("Rate of change test", expanded=True)
-
-with rate_of_change_expander:
+with st.expander("Rate of change test", expanded=True):
     with st.popover("Test configuration suggestions"):
         st.markdown("""
 ### Rate of change test. Input as a rate.  
@@ -320,13 +310,11 @@ May want to adjust this so it’s dependent on tidal range
                 title="Rate of change test",
             )
             st.bokeh_chart(plot, use_container_width=True)
+            with st.popover("Tabular results"):
+                st.dataframe(rate_of_change_df)
 
-            st.dataframe(rate_of_change_df)
 
-
-spike_expander = st.expander("Spike test", expanded=True)
-
-with spike_expander:
+with st.expander("Spike test", expanded=True):
     with st.popover("Test configuration suggestions"):
         st.markdown("""
 ### Spike test: Input as a magnitude that’s checked across a measurement and the two adjacent measurements.  
@@ -376,12 +364,11 @@ Maybe default to same as rate of change test?
                 title="Spike test",
             )
             st.bokeh_chart(plot, use_container_width=True)
-            st.dataframe(spike_df)
+            with st.popover("Tabular results"):
+                st.dataframe(spike_df)
 
 
-flat_line_expander = st.expander("Flat line test", expanded=True)
-
-with flat_line_expander:
+with st.expander("Flat line test", expanded=True):
     with st.popover("Test configuration suggestions"):
         st.markdown("""
 ### Flat line test: If there’s some lack of variance over some amount of time, mark as suspect/fail 
@@ -443,7 +430,8 @@ Rationale: During neap tides in Portland, you could see as little as +/- 0.25 ft
                 title="Flat line test",
             )
             st.bokeh_chart(plot, use_container_width=True)
-            st.dataframe(flat_line_df)
+            with st.popover("Tabular results"):
+                st.dataframe(flat_line_df)
 
 
 with st.expander("Aggregated results", expanded=True):
@@ -469,7 +457,7 @@ with st.expander("Aggregated results", expanded=True):
             **qartod,
             **flat_line_test_config,
         }
-    
+
     all_df = qc_helpers.run_qc(
         data,
         qc_helpers.Config(
@@ -484,23 +472,23 @@ with st.expander("Aggregated results", expanded=True):
         all_df,
     )
     st.bokeh_chart(plot, use_container_width=True)
-    
-    st.write(qartod)
 
-    st.dataframe(all_df)
-with st.expander("Configuration"):
+    with st.popover("Tabular results and raw test config"):
+        st.write(qartod)
+        st.dataframe(all_df)
+with st.expander("Configuration", expanded=True):
     st.markdown("### NERACOOS Sea-Eagle config")
 
     datum_col, calc_dates_col = st.columns([1, 1])
-    
+
     with datum_col:
         st.markdown("Additional datums")
 
         datums = {
-                    "mhhw": mhhw,
-                    "mllw": mllw,
-                }
-        
+            "mhhw": mhhw,
+            "mllw": mllw,
+        }
+
         if mhw := st.number_input("Mean High Water (m)"):
             datums["mhw"] = mhw
         if mtl := st.number_input("Mean Tide Level (m)"):
@@ -511,7 +499,9 @@ with st.expander("Configuration"):
             datums["mlw"] = mlw
 
     with calc_dates_col:
-        st.markdown("If datums were calculated, provide the date of calculation, and range that they were calculated over")
+        st.markdown(
+            "If datums were calculated, provide the date of calculation, and range that they were calculated over"
+        )
         if st.toggle("Datums manually calculated or updated", value=False):
             if calc_date := st.date_input("Calculation date"):
                 datums["date_calculated"] = calc_date.isoformat()
@@ -526,9 +516,7 @@ with st.expander("Configuration"):
         "start_dt": station_info.installation_date.isoformat(),
         "latitude": station_info.latitude,
         "longitude": station_info.longitude,
-        "datums": {
-            "manual_datums": datums
-        },
+        "datums": {"manual_datums": datums},
         "qc": {"qartod": {"contexts": [{"streams": {"observed": {"qartod": qartod}}}]}},
     }
     if summary := st.text_area("Station summary information"):
@@ -537,5 +525,7 @@ with st.expander("Configuration"):
     st.markdown("Station configuration to provide to ODP")
 
     config_yaml = yaml.dump(config)
-    st.download_button("Download station config", config_yaml, file_name=f"{station_id}.yaml")
+    st.download_button(
+        "Download station config", config_yaml, file_name=f"{station_id}.yaml"
+    )
     st.code(config_yaml, language="yaml")
