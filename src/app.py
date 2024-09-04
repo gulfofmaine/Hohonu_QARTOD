@@ -523,16 +523,21 @@ with st.expander("Configuration", expanded=True):
     config = {
         # "title": station_info.location,
         "station_id": station_id,
-        "start_dt": station_info.installation_date.isoformat(),
         "latitude": station_info.latitude,
         "longitude": station_info.longitude,
         "datums": {"manual_datums": datums},
         "qc": {"qartod": {"contexts": [{"streams": {"observed": {"qartod": qartod}}}]}},
     }
+
     if summary := st.text_area("Station summary information"):
         config["summary"] = summary
 
     st.markdown("Station configuration to provide to ODP")
+
+    if station_info.installation_date:
+        config["start_date"] = station_info.installation_date.isoformat(),
+    else:
+        st.warning("No installation date provided for `start_date`")
 
     try:
         import yaml
