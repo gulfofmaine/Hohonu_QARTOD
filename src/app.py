@@ -535,7 +535,7 @@ with st.expander("Configuration", expanded=True):
     st.markdown("Station configuration to provide to ODP")
 
     if station_info.installation_date:
-        config["start_date"] = station_info.installation_date.isoformat(),
+        config["start_date"] = station_info.installation_date.isoformat()
     else:
         st.warning("No installation date provided for `start_date`")
 
