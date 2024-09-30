@@ -156,7 +156,7 @@ class Subscribed(BaseModel):
 class StationInfo(BaseModel):
     """Gauge station metadata from Hohonu API"""
 
-    access: bool
+    # access: bool
     custom_nearest_noaa: Optional[str] = None
     d2w_begin_caution: Optional[float] = None
     d2w_begin_emergency: Optional[float] = None
