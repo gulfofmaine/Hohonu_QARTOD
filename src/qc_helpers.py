@@ -21,7 +21,7 @@ def run_qc(df: pd.DataFrame, config: Config) -> pd.DataFrame:
 def plot_results(
     data: pd.DataFrame,
     test_name: str,
-    var_name="observed",
+    var_name="navd88_meters",
     title: str = None,
 ):
     """Plot the qc results on top of the source data"""
@@ -70,7 +70,7 @@ def plot_results(
 
 def plot_aggregate(
     data: pd.DataFrame,
-    var_name="observed",
+    var_name="navd88_meters",
     aggregate_name: str = "qartod_qc_rollup",
     title: str = None,
 ):

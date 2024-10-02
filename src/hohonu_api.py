@@ -104,7 +104,7 @@ class NoaaInfo(BaseModel):
 
 
 class NoaaData(BaseModel):
-    """Forecasted and observed data from nearest valid NOAA station"""
+    """Forecasted and navd88_meters data from nearest valid NOAA station"""
 
     observed: NoaaInfo
     prediction: NoaaInfo
@@ -126,7 +126,7 @@ def hohonu_response_to_df(response: DataResponse) -> pd.DataFrame:
     df = pd.DataFrame(
         {
             "time": pd.to_datetime(response.data[0]),
-            "observed": pd.Series(response.data[1]) * FEET_TO_METERS,  # Convert feet to meters
+            "navd88_meters": pd.Series(response.data[1]) * FEET_TO_METERS,  # Convert feet to meters
             "forecast": pd.Series(response.data[2]) * FEET_TO_METERS,  # Convert feet to meters
         },
     )
