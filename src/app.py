@@ -1,135 +1,253 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import streamlit as st
 
-from hohonu_api import HohonuApi, DATE_FORMAT, hohonu_response_to_df
 import qc_helpers
 
 FEET_TO_METERS = 0.3048
 
 st.markdown("""
-# Hohonu dataset QARTOD and config generation
+# Water level QARTOD and config generation
 
 This tool is to help generate QARTOD configuration files
-for Hohonu gauges deployed for NERACOOS.
+for Hohonu, Brown/URI, and other water level gauges deployed for NERACOOS.
 
 Testing range suggestions developed in coordination with
-Hannah Baranes.   
+Hannah Baranes for the Gulf of Maine.   
 """)
 
-try:
-    api_key = st.secrets["HOHONU_API_KEY"]
-except KeyError:
-    api_key = st.text_input(
-        "Hohonu API key",
-        type="password",
-        help="""
-Please enter your Hohonu API key. It can be retrieved from
-https://dashboard.hohonu.io/profile
-""",
-    )
-
-if api_key is None or api_key == "":
-    st.error(
-        "No Hohonu API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box."
-    )
-    st.stop()
-
-api = HohonuApi(api_key=api_key)
-
-
-@st.cache_data
-def load_station_info(station_id: str):
-    """Load station info JSON from
-    https://dashboard.hohonu.io/api/v1/stations/{station_id}
-    """
-    response = api.station_info(station_id)
-    return response
-
-
-@st.cache_data
-def fetch_data(station_id: str, date_range: tuple[datetime, datetime]):
-    """Load data for a given day based on YYYY-MM-DD string
-    from https://dashboard.hohonu.io/api/v1/stations/{stationId}/statistic/"""
-
-    response = api.fetch_data(
-        start_date=date_range[0].strftime(DATE_FORMAT),
-        end_date=date_range[1].strftime(DATE_FORMAT),
-        station_id=station_id,
-        cleaned=True,
-        datum="NAVD",
-    )
-    df = hohonu_response_to_df(response)
-    return df
-
+HOHONU_DATA_SOURCE = "Hohonu"
+BROWN_DATA_SOURCE = "Brown/URI"
+DATA_SOURCES = [HOHONU_DATA_SOURCE, BROWN_DATA_SOURCE]
 
 with st.sidebar:
-    with st.expander("Station Selector", expanded=True):
-        station_id = st.text_input(
-            "Station ID",
-            value="hohonu-180",
-            help="""
-    To get the station ID, find the station in the [Hohonu dashboard](https://dashboard.hohonu.io/),
-    then select the segment between `map-page/` and it's name.
+    data_source = st.selectbox("Select data source", DATA_SOURCES)
 
-    For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
+
+config = {}
+qartod = {}
+
+if data_source == HOHONU_DATA_SOURCE:
+    from hohonu_api import HohonuApi, DATE_FORMAT, hohonu_response_to_df
+
+
+    try:
+        api_key = st.secrets["HOHONU_API_KEY"]
+    except KeyError:
+        api_key = st.text_input(
+            "Hohonu API key",
+            type="password",
+            help="""
+    Please enter your Hohonu API key. It can be retrieved from
+    https://dashboard.hohonu.io/profile
     """,
         )
 
-        station_info = load_station_info(station_id)
-
-        st.markdown(f"""
-        {station_info.location}
-
-        - Latitude: {station_info.latitude}
-        - Longitude: {station_info.longitude}
-        - NAVD88: {station_info.navd88}
-        - Install date: {station_info.installation_date}
-        """)
-
-with st.sidebar:
-    with st.expander("Data selector", expanded=True):
-        now = datetime.now()
-        week_ago = now - timedelta(days=7)
-
-        date_range = st.date_input(
-            "Date range",
-            (week_ago, now),
-            max_value=now,
-            min_value=station_info.installation_date,
-            help="""
-                Date range to load testing data for.
-                """,
+    if api_key is None or api_key == "":
+        st.error(
+            "No Hohonu API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box."
         )
+        st.stop()
 
-        too_long = date_range[1] - date_range[0] > timedelta(days=30)
-        if too_long:
-            st.warning(
-                "Please select a date range of less than 30 days. "
-                "This is to prevent the API from timing out."
+    api = HohonuApi(api_key=api_key)
+
+
+    @st.cache_data
+    def load_station_info(station_id: str):
+        """Load station info JSON from
+        https://dashboard.hohonu.io/api/v1/stations/{station_id}
+        """
+        response = api.station_info(station_id)
+        return response
+
+
+    @st.cache_data
+    def fetch_data(station_id: str, date_range: tuple[datetime, datetime]):
+        """Load data for a given day based on YYYY-MM-DD string
+        from https://dashboard.hohonu.io/api/v1/stations/{stationId}/statistic/"""
+
+        response = api.fetch_data(
+            start_date=date_range[0].strftime(DATE_FORMAT),
+            end_date=date_range[1].strftime(DATE_FORMAT),
+            station_id=station_id,
+            cleaned=True,
+            datum="NAVD",
+        )
+        try:
+            df = hohonu_response_to_df(response)
+            return df
+        except IndexError as e:
+            msg = (
+                f"Error with response: {response}"
+            )
+            raise IndexError(msg) from e
+
+
+    with st.sidebar:
+        with st.expander("Station Selector", expanded=True):
+            station_id = st.text_input(
+                "Station ID",
+                # value="hohonu-180",
+                help="""
+        To get the station ID, find the station in the [Hohonu dashboard](https://dashboard.hohonu.io/),
+        then select the segment between `map-page/` and it's name.
+
+        For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
+        """,
             )
 
-        load_data_button = st.toggle("Load data", disabled=too_long)
+            if station_id == "":
+                st.warning(
+                    "Please enter a station ID. It can be found in the URL of the station in the Hohonu dashboard."
+                )
+                st.stop()
 
-if not load_data_button:
-    st.warning(
-        "Please select a date range and toggle 'Load data' to generate QARTOD config."
-        ""
-    )
+            station_info = load_station_info(station_id)
+
+            st.markdown(f"""
+            {station_info.location}
+
+            - Latitude: {station_info.latitude}
+            - Longitude: {station_info.longitude}
+            - navd88_meters: {station_info.navd88}
+            - Install date: {station_info.installation_date}
+            """)
+            config.update({
+                "station_id": station_id,
+                "latitude": station_info.latitude,
+                "longitude": station_info.longitude,
+                "navd88_meters": station_info.navd88,
+                "start_date": station_info.installation_date.isoformat(),
+            })
+
+    with st.sidebar:
+        with st.expander("Data selector", expanded=True):
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+
+            date_range = st.date_input(
+                "Date range",
+                (week_ago, now),
+                max_value=now,
+                min_value=station_info.installation_date,
+                help="""
+                    Date range to load testing data for.
+                    """,
+            )
+
+            too_long = date_range[1] - date_range[0] > timedelta(days=30)
+            if too_long:
+                st.warning(
+                    "Please select a date range of less than 30 days. "
+                    "This is to prevent the API from timing out."
+                )
+
+            load_data_button = st.toggle("Load data", disabled=too_long)
+
+    if not load_data_button:
+        st.warning(
+            "Please select a date range and toggle 'Load data' to generate QARTOD config."
+            ""
+        )
+        st.stop()
+
+
+    data = fetch_data(station_id, date_range)
+
+
+elif data_source == BROWN_DATA_SOURCE:
+    from things_api import ThingsApi
+
+    try:
+        api_key = st.secrets["THINGS_API_KEY"]
+    except KeyError:
+        api_key = st.text_input(
+            "Things network API key",
+            type="password",
+            help="""
+        Please enter your Things Network API key. It can be retrieved from
+        API Keys which is avaliable underneath the Applications tab of the dashboard.
+        """
+        )
+
+    if api_key is None or api_key == "":
+        st.error("No The Things Network API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box.")
+        st.stop()
+
+    api = ThingsApi(api_key=api_key, account_id="neracoos", application_id="providence-wl", region="nam1")
+
+    @st.cache_data
+    def fetch_data(device_id: str, start_date: date, end_date: date, navd88_elevation_meters: float,):
+        """Load device info from The Things Network"""
+        df = api.fetch_data(device_id, start_date, end_date, navd88_elevation_meters)
+        return df
+
+
+    with st.sidebar:
+        with st.expander("Station selector", expanded=True):
+            station_id = st.text_input(
+                "Things device ID",
+                # value="brown-wl-012",
+                help="""
+                The ID of the device in The Things Network console.
+                """
+            )
+
+            if station_id == "":
+                st.warning(
+                    "Please enter a device ID. It can be found in The Things Network console."
+                )
+                st.stop()
+
+            latitude = st.number_input("Station Latitude (decimal degrees)")
+            longitude = st.number_input("Station longitude (decimal degrees)")
+            navd88_elevation_meters = st.number_input("Elevation of station above navd88_meters")
+            install_date = st.date_input("Install date")
+
+            config.update({
+                "device_id": station_id,
+                "latitude": latitude,
+                "longitude": longitude,
+                "navd88_elevation_meters": navd88_elevation_meters,
+                "start_date": install_date.isoformat(),
+            })
+
+    with st.sidebar:
+        with st.expander("Data selector", expanded=True):
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+            month_ago = now - timedelta(days=30)
+
+            date_range = st.date_input(
+                "Date range",
+                (week_ago, now),
+                max_value=now,
+                min_value=month_ago,
+                help="Date range to load testing data for (up to a max of a month ago)"
+            )
+
+            load_data_button = st.toggle("Load data")
+    
+    if not load_data_button:
+        st.warning("Please select a date range and toggle 'Load data' to start generating QARTOD config")
+        st.stop()
+
+    data = fetch_data(station_id, date_range[0], date_range[1], navd88_elevation_meters)
+
+
+else:
+    st.error("No idea how you selected another data source, exploding now")
     st.stop()
-
-
-data = fetch_data(station_id, date_range)
 
 with st.expander("Loaded data"):
     st.dataframe(data)
-    st.line_chart(data, x="time", y="observed", y_label="NAVD88 (m)")
+    st.line_chart(data, x="time", y="navd88_meters", y_label="navd88_meters (m)")
 
 with st.sidebar:
     with st.expander("Datum selector", expanded=True):
         st.markdown("""
                     
-    Datums should be entered as offsets from NAVD88.
+    Datums should be entered as offsets from navd88_meters.
 
     They can either be entered from known values,
     or can be calculated using [CO-OPS Tidal Analysis Datum Calculator](https://access.co-ops.nos.noaa.gov/datumcalc/).
@@ -141,7 +259,7 @@ with st.sidebar:
             "Mean High High Water (MHHW meters)",
             # value=station_info.mhhw,
             help="""
-            The mean high high water (MHHW) datum offset for the gauge in meters from NAVD88.datum for the gauge.
+            The mean high high water (MHHW) datum offset for the gauge in meters from navd88_meters.datum for the gauge.
             """,
         )
 
@@ -149,7 +267,7 @@ with st.sidebar:
             "Mean Low Low Water (MLLW meters)",
             # value=station_info.mllw,
             help="""
-            The mean low low water (MLLW) datum offset for the gauge in meters from NAVD88.
+            The mean low low water (MLLW) datum offset for the gauge in meters from navd88_meters.
             """,
         )
 
@@ -168,7 +286,7 @@ with st.expander("Gross range test", expanded=True):
         
 
         For stations without tidal datums:  
-        - If there are no tidal datums because the station was just installed: use VDatum to get MHHW and MLLW relative to NAVD88 at a point close to the sensor, and use the same upper and lower limits   
+        - If there are no tidal datums because the station was just installed: use VDatum to get MHHW and MLLW relative to navd88_meters at a point close to the sensor, and use the same upper and lower limits   
             - Note: if it’s a station with river influence (like Bath), it might require some local expertise to set the limits. A solid approach is just taking the HW and LW measured over the course of the first week, and using something like HW + 10 ft and LW – 10 ft to be conservative  
         - If there are no tidal datums because the sensor bottoms out at low tide:  
             - Lower limit: Use the dry bottom elevation  
@@ -192,7 +310,7 @@ with st.expander("Gross range test", expanded=True):
             - Newport, RI: 9.45 (1938)
             -New London, CT: 7.53 (1938) 
 
-        Lowest observed  
+        Lowest navd88_meters  
         - Eastport: -3.46 ft MLLW  (this will have the largest variability)  
         """)
 
@@ -247,11 +365,13 @@ with st.expander("Gross range test", expanded=True):
                     "fail_span": [gross_fail_lower_limit, gross_fail_upper_limit],
                 }
             }
+            qartod.update(gross_range_test_config)
+
             gross_df = qc_helpers.run_qc(
                 data,
                 qc_helpers.Config(
                     {
-                        "observed": {
+                        "navd88_meters": {
                             "qartod": gross_range_test_config,
                         }
                     }
@@ -303,11 +423,13 @@ May want to adjust this so it’s dependent on tidal range
                     "threshold": rate_threshold,
                 }
             }
+            qartod.update(rate_of_change_test_config)
+
             rate_of_change_df = qc_helpers.run_qc(
                 data,
                 qc_helpers.Config(
                     {
-                        "observed": {
+                        "navd88_meters": {
                             "qartod": rate_of_change_test_config,
                         }
                     }
@@ -357,11 +479,13 @@ Maybe default to same as rate of change test?
                     "fail_threshold": spike_fail_threshold,
                 }
             }
+            qartod.update(spike_test_config)
+
             spike_df = qc_helpers.run_qc(
                 data,
                 qc_helpers.Config(
                     {
-                        "observed": {
+                        "navd88_meters": {
                             "qartod": spike_test_config,
                         }
                     }
@@ -424,11 +548,13 @@ Rationale: During neap tides in Portland, you could see as little as +/- 0.25 ft
                     "fail_threshold": flat_line_fail_threshold,
                 }
             }
+            qartod.update(flat_line_test_config)
+
             flat_line_df = qc_helpers.run_qc(
                 data,
                 qc_helpers.Config(
                     {
-                        "observed": {
+                        "navd88_meters": {
                             "qartod": flat_line_test_config,
                         }
                     }
@@ -445,34 +571,11 @@ Rationale: During neap tides in Portland, you could see as little as +/- 0.25 ft
 
 
 with st.expander("Aggregated results", expanded=True):
-    qartod = {}
-
-    if gross_range_test_toggle:
-        qartod = {
-            **qartod,
-            **gross_range_test_config,
-        }
-    if rate_of_change_test_toggle:
-        qartod = {
-            **qartod,
-            **rate_of_change_test_config,
-        }
-    if spike_test_toggle:
-        qartod = {
-            **qartod,
-            **spike_test_config,
-        }
-    if flat_line_test_toggle:
-        qartod = {
-            **qartod,
-            **flat_line_test_config,
-        }
-
     all_df = qc_helpers.run_qc(
         data,
         qc_helpers.Config(
             {
-                "observed": {
+                "navd88_meters": {
                     "qartod": qartod,
                 }
             }
@@ -520,24 +623,30 @@ with st.expander("Configuration", expanded=True):
             if end_date := st.date_input("End date"):
                 datums["calculation_end_date"] = end_date.isoformat()
 
-    config = {
-        # "title": station_info.location,
-        "station_id": station_id,
-        "latitude": station_info.latitude,
-        "longitude": station_info.longitude,
+    config .update({
+        # # "title": station_info.location,
+        # "station_id": station_id,
+        # "latitude": station_info.latitude,
+        # "longitude": station_info.longitude,
         "datums": {"manual_datums": datums},
-        "qc": {"qartod": {"contexts": [{"streams": {"observed": {"qartod": qartod}}}]}},
-    }
+        "qc": {"qartod": {"contexts": [{"streams": {"navd88_meters": {"qartod": qartod}}}]}},
+    })
 
-    if summary := st.text_area("Station summary information"):
+    if title := st.text_input("Station title", help="For display in ERDDAP, Mariners, and other locations, such as 'Department of Marine Resources, Boothbay Harbor, ME Hohonu tide gauge'"):
+        config["title"] = title
+
+    if summary := st.text_area(
+            "Station summary information", 
+            help="""
+            What should we and our users know about a station?
+
+            - Why is is sited here?
+            - Are there any site specific features to be aware of (dries out at low tide, ice risk in winter,...)?
+            """
+        ):
         config["summary"] = summary
 
     st.markdown("Station configuration to provide to ODP")
-
-    if station_info.installation_date:
-        config["start_date"] = station_info.installation_date.isoformat()
-    else:
-        st.warning("No installation date provided for `start_date`")
 
     try:
         import yaml
