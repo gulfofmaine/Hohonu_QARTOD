@@ -361,7 +361,7 @@ with st.expander("Gross range test", expanded=True):
         else:
             gross_range_test_config = {
                 "gross_range_test": {
-                    "suspect_span": [gross_fail_lower_limit, gross_fail_upper_limit],
+                    "suspect_span": [gross_suspect_lower_limit, gross_suspect_upper_limit],
                     "fail_span": [gross_fail_lower_limit, gross_fail_upper_limit],
                 }
             }
@@ -623,11 +623,7 @@ with st.expander("Configuration", expanded=True):
             if end_date := st.date_input("End date"):
                 datums["calculation_end_date"] = end_date.isoformat()
 
-    config .update({
-        # # "title": station_info.location,
-        # "station_id": station_id,
-        # "latitude": station_info.latitude,
-        # "longitude": station_info.longitude,
+    config.update({
         "datums": {"manual_datums": datums},
         "qc": {"qartod": {"contexts": [{"streams": {"navd88_meters": {"qartod": qartod}}}]}},
     })
