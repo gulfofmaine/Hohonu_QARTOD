@@ -117,8 +117,21 @@ if data_source == HOHONU_DATA_SOURCE:
                 "latitude": station_info.latitude,
                 "longitude": station_info.longitude,
                 "navd88_meters": station_info.navd88,
-                "start_date": station_info.installation_date.isoformat(),
             })
+
+            try:
+                config.update({
+                    "start_date": station_info.installation_date.isoformat(),
+                })
+            except AttributeError:
+                with st.sidebar:
+                    st.warning(
+                        "No installation date found. Please enter it manually."
+                    )
+                    start_date = st.date_input("Installation date")
+                    config.update({
+                        "start_date": start_date.isoformat(),
+                    })
 
     with st.sidebar:
         with st.expander("Data selector", expanded=True):
