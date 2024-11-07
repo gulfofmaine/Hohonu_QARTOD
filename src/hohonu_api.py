@@ -190,3 +190,144 @@ class StationInfo(BaseModel):
     tidal: bool
     uuid: str
     water: bool
+
+
+def load_hohonu_streamlit_data_and_config():
+    import streamlit as st
+
+    config = {}
+
+    try:
+        api_key = st.secrets["HOHONU_API_KEY"]
+    except KeyError:
+        api_key = st.text_input(
+            "Hohonu API key",
+            type="password",
+            help="""
+    Please enter your Hohonu API key. It can be retrieved from
+    https://dashboard.hohonu.io/profile
+    """,
+        )
+    
+    if api_key is None or api_key == "":
+        st.error(
+            "No Hohonu API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box."
+        )
+        st.stop()
+
+    api = HohonuApi(api_key=api_key)
+
+    @st.cache_data
+    def load_station_info(station_id: str):
+        """Load station info JSON from
+        https://dashboard.hohonu.io/api/v1/stations/{station_id}
+        """
+        response = api.station_info(station_id)
+        return response
+
+    @st.cache_data
+    def fetch_data(station_id: str, date_range: tuple[datetime, datetime]):
+        """Load data for a given day based on YYYY-MM-DD string
+        from https://dashboard.hohonu.io/api/v1/stations/{stationId}/statistic/"""
+
+        response = api.fetch_data(
+            start_date=date_range[0].strftime(DATE_FORMAT),
+            end_date=date_range[1].strftime(DATE_FORMAT),
+            station_id=station_id,
+            cleaned=True,
+            datum="NAVD",
+        )
+        try:
+            df = hohonu_response_to_df(response)
+            return df
+        except IndexError as e:
+            msg = (
+                f"Error with response: {response}"
+            )
+            raise IndexError(msg) from e
+        
+    with st.sidebar:
+        with st.expander("Station Selector", expanded=True):
+            station_id = st.text_input(
+                "Station ID",
+                # value="hohonu-180",
+                help="""
+        To get the station ID, find the station in the [Hohonu dashboard](https://dashboard.hohonu.io/),
+        then select the segment between `map-page/` and it's name.
+
+        For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
+        """,
+            )
+
+            if station_id == "":
+                st.warning(
+                    "Please enter a station ID. It can be found in the URL of the station in the Hohonu dashboard."
+                )
+                st.stop()
+
+            station_info = load_station_info(station_id)
+
+            st.markdown(f"""
+            {station_info.location}
+
+            - Latitude: {station_info.latitude}
+            - Longitude: {station_info.longitude}
+            - navd88_meters: {station_info.navd88}
+            - Install date: {station_info.installation_date}
+            """)
+            config.update({
+                "station_id": station_id,
+                "latitude": station_info.latitude,
+                "longitude": station_info.longitude,
+                "navd88_meters": station_info.navd88,
+            })
+
+            try:
+                config.update({
+                    "start_date": station_info.installation_date.isoformat(),
+                })
+            except AttributeError:
+                with st.sidebar:
+                    st.warning(
+                        "No installation date found. Please enter it manually."
+                    )
+                    start_date = st.date_input("Installation date")
+                    config.update({
+                        "start_date": start_date.isoformat(),
+                    })
+
+    with st.sidebar:
+        with st.expander("Data selector", expanded=True):
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+
+            date_range = st.date_input(
+                "Date range",
+                (week_ago, now),
+                max_value=now,
+                min_value=station_info.installation_date,
+                help="""
+                    Date range to load testing data for.
+                    """,
+            )
+
+            too_long = date_range[1] - date_range[0] > timedelta(days=30)
+            if too_long:
+                st.warning(
+                    "Please select a date range of less than 30 days. "
+                    "This is to prevent the API from timing out."
+                )
+
+            load_data_button = st.toggle("Load data", disabled=too_long)
+
+    if not load_data_button:
+        st.warning(
+            "Please select a date range and toggle 'Load data' to generate QARTOD config."
+            ""
+        )
+        st.stop()
+
+
+    data = fetch_data(station_id, date_range)
+
+    return data, config

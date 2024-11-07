@@ -5,3 +5,4 @@ pandas>=2.2.2,<2.3
 bokeh<3
 pyyaml>=6.0.2,<6.1
 numpy<2
+erddapy>=2.2.3,<3
