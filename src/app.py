@@ -1,266 +1,61 @@
-from datetime import datetime, timedelta, date
-
 import streamlit as st
 
+from regions import GulfOfMaine
 import qc_helpers
 
 FEET_TO_METERS = 0.3048
+
+
+region = GulfOfMaine()
 
 st.markdown("""
 # Water level QARTOD and config generation
 
 This tool is to help generate QARTOD configuration files
-for Hohonu, Brown/URI, and other water level gauges deployed for NERACOOS.
-
-Testing range suggestions developed in coordination with
-Hannah Baranes for the Gulf of Maine.   
+for Hohonu, Brown/URI, and other water level gauges deployed for NERACOOS. 
 """)
+
+st.markdown(region.general_info)
 
 HOHONU_DATA_SOURCE = "Hohonu"
 BROWN_DATA_SOURCE = "Brown/URI"
-DATA_SOURCES = [HOHONU_DATA_SOURCE, BROWN_DATA_SOURCE]
+ERDDAP = "ERDDAP"
+DATA_SOURCES = [HOHONU_DATA_SOURCE, BROWN_DATA_SOURCE, ERDDAP]
 
 with st.sidebar:
     data_source = st.selectbox("Select data source", DATA_SOURCES)
 
 
-config = {}
 qartod = {}
-
+column = "navd88_meters"
 if data_source == HOHONU_DATA_SOURCE:
-    from hohonu_api import HohonuApi, DATE_FORMAT, hohonu_response_to_df
+    from hohonu_api import load_hohonu_streamlit_data_and_config
 
-
-    try:
-        api_key = st.secrets["HOHONU_API_KEY"]
-    except KeyError:
-        api_key = st.text_input(
-            "Hohonu API key",
-            type="password",
-            help="""
-    Please enter your Hohonu API key. It can be retrieved from
-    https://dashboard.hohonu.io/profile
-    """,
-        )
-
-    if api_key is None or api_key == "":
-        st.error(
-            "No Hohonu API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box."
-        )
-        st.stop()
-
-    api = HohonuApi(api_key=api_key)
-
-
-    @st.cache_data
-    def load_station_info(station_id: str):
-        """Load station info JSON from
-        https://dashboard.hohonu.io/api/v1/stations/{station_id}
-        """
-        response = api.station_info(station_id)
-        return response
-
-
-    @st.cache_data
-    def fetch_data(station_id: str, date_range: tuple[datetime, datetime]):
-        """Load data for a given day based on YYYY-MM-DD string
-        from https://dashboard.hohonu.io/api/v1/stations/{stationId}/statistic/"""
-
-        response = api.fetch_data(
-            start_date=date_range[0].strftime(DATE_FORMAT),
-            end_date=date_range[1].strftime(DATE_FORMAT),
-            station_id=station_id,
-            cleaned=True,
-            datum="NAVD",
-        )
-        try:
-            df = hohonu_response_to_df(response)
-            return df
-        except IndexError as e:
-            msg = (
-                f"Error with response: {response}"
-            )
-            raise IndexError(msg) from e
-
-
-    with st.sidebar:
-        with st.expander("Station Selector", expanded=True):
-            station_id = st.text_input(
-                "Station ID",
-                # value="hohonu-180",
-                help="""
-        To get the station ID, find the station in the [Hohonu dashboard](https://dashboard.hohonu.io/),
-        then select the segment between `map-page/` and it's name.
-
-        For example `hohonu-180` for `https://dashboard.hohonu.io/map-page/hohonu-180/ChebeagueIsland,Maine`.
-        """,
-            )
-
-            if station_id == "":
-                st.warning(
-                    "Please enter a station ID. It can be found in the URL of the station in the Hohonu dashboard."
-                )
-                st.stop()
-
-            station_info = load_station_info(station_id)
-
-            st.markdown(f"""
-            {station_info.location}
-
-            - Latitude: {station_info.latitude}
-            - Longitude: {station_info.longitude}
-            - navd88_meters: {station_info.navd88}
-            - Install date: {station_info.installation_date}
-            """)
-            config.update({
-                "station_id": station_id,
-                "latitude": station_info.latitude,
-                "longitude": station_info.longitude,
-                "navd88_meters": station_info.navd88,
-            })
-
-            try:
-                config.update({
-                    "start_date": station_info.installation_date.isoformat(),
-                })
-            except AttributeError:
-                with st.sidebar:
-                    st.warning(
-                        "No installation date found. Please enter it manually."
-                    )
-                    start_date = st.date_input("Installation date")
-                    config.update({
-                        "start_date": start_date.isoformat(),
-                    })
-
-    with st.sidebar:
-        with st.expander("Data selector", expanded=True):
-            now = datetime.now()
-            week_ago = now - timedelta(days=7)
-
-            date_range = st.date_input(
-                "Date range",
-                (week_ago, now),
-                max_value=now,
-                min_value=station_info.installation_date,
-                help="""
-                    Date range to load testing data for.
-                    """,
-            )
-
-            too_long = date_range[1] - date_range[0] > timedelta(days=30)
-            if too_long:
-                st.warning(
-                    "Please select a date range of less than 30 days. "
-                    "This is to prevent the API from timing out."
-                )
-
-            load_data_button = st.toggle("Load data", disabled=too_long)
-
-    if not load_data_button:
-        st.warning(
-            "Please select a date range and toggle 'Load data' to generate QARTOD config."
-            ""
-        )
-        st.stop()
-
-
-    data = fetch_data(station_id, date_range)
-
+    data, config = load_hohonu_streamlit_data_and_config()
 
 elif data_source == BROWN_DATA_SOURCE:
-    from things_api import ThingsApi
+    from things_api import load_things_streamlit_data_and_config
 
-    try:
-        api_key = st.secrets["THINGS_API_KEY"]
-    except KeyError:
-        api_key = st.text_input(
-            "Things network API key",
-            type="password",
-            help="""
-        Please enter your Things Network API key. It can be retrieved from
-        API Keys which is avaliable underneath the Applications tab of the dashboard.
-        """
-        )
-
-    if api_key is None or api_key == "":
-        st.error("No The Things Network API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box.")
-        st.stop()
-
-    api = ThingsApi(api_key=api_key, account_id="neracoos", application_id="providence-wl", region="nam1")
-
-    @st.cache_data
-    def fetch_data(device_id: str, start_date: date, end_date: date, navd88_elevation_meters: float,):
-        """Load device info from The Things Network"""
-        df = api.fetch_data(device_id, start_date, end_date, navd88_elevation_meters)
-        return df
+    data, config = load_things_streamlit_data_and_config()
 
 
-    with st.sidebar:
-        with st.expander("Station selector", expanded=True):
-            station_id = st.text_input(
-                "Things device ID",
-                # value="brown-wl-012",
-                help="""
-                The ID of the device in The Things Network console.
-                """
-            )
+elif data_source == ERDDAP:
+    from erddap import load_erddap_data_and_config
 
-            if station_id == "":
-                st.warning(
-                    "Please enter a device ID. It can be found in The Things Network console."
-                )
-                st.stop()
-
-            latitude = st.number_input("Station Latitude (decimal degrees)")
-            longitude = st.number_input("Station longitude (decimal degrees)")
-            navd88_elevation_meters = st.number_input("Elevation of station above navd88_meters")
-            install_date = st.date_input("Install date")
-
-            config.update({
-                "device_id": station_id,
-                "latitude": latitude,
-                "longitude": longitude,
-                "navd88_elevation_meters": navd88_elevation_meters,
-                "start_date": install_date.isoformat(),
-            })
-
-    with st.sidebar:
-        with st.expander("Data selector", expanded=True):
-            now = datetime.now()
-            week_ago = now - timedelta(days=7)
-            month_ago = now - timedelta(days=30)
-
-            date_range = st.date_input(
-                "Date range",
-                (week_ago, now),
-                max_value=now,
-                min_value=month_ago,
-                help="Date range to load testing data for (up to a max of a month ago)"
-            )
-
-            load_data_button = st.toggle("Load data")
-    
-    if not load_data_button:
-        st.warning("Please select a date range and toggle 'Load data' to start generating QARTOD config")
-        st.stop()
-
-    data = fetch_data(station_id, date_range[0], date_range[1], navd88_elevation_meters)
-
-
+    data, config, column = load_erddap_data_and_config()
 else:
     st.error("No idea how you selected another data source, exploding now")
     st.stop()
 
 with st.expander("Loaded data"):
     st.dataframe(data)
-    st.line_chart(data, x="time", y="navd88_meters", y_label="navd88_meters (m)")
+    st.line_chart(data, x="time", y=column, y_label=column)
 
 with st.sidebar:
     with st.expander("Datum selector", expanded=True):
         st.markdown("""
                     
-    Datums should be entered as offsets from navd88_meters.
+    Datums should be entered as meters in from NAVD88.
 
     They can either be entered from known values,
     or can be calculated using [CO-OPS Tidal Analysis Datum Calculator](https://access.co-ops.nos.noaa.gov/datumcalc/).
@@ -285,47 +80,11 @@ with st.sidebar:
         )
 
 
+test_defaults = region.calculate_defaults(mllw, mhhw)
+
 with st.expander("Gross range test", expanded=True):
     with st.popover("Test configuration suggestions"):
-        st.markdown("""
-        ### Gross range test configuration for Gulf of Maine (not New England Shelf)
-
-        #### Suspect Limits
-
-        For stations with tidal datums (might not want this approach because it will always take a while to get tidal datums, and tidal datums change):  
-        - Upper limit of range: MHHW + 6 ft  
-        - Lower limit of range: MLLW – 4.5 ft  
-
-        
-
-        For stations without tidal datums:  
-        - If there are no tidal datums because the station was just installed: use VDatum to get MHHW and MLLW relative to navd88_meters at a point close to the sensor, and use the same upper and lower limits   
-            - Note: if it’s a station with river influence (like Bath), it might require some local expertise to set the limits. A solid approach is just taking the HW and LW measured over the course of the first week, and using something like HW + 10 ft and LW – 10 ft to be conservative  
-        - If there are no tidal datums because the sensor bottoms out at low tide:  
-            - Lower limit: Use the dry bottom elevation  
-            - Upper limit: Use VDatum MHHW + 6 ft
-
-                                    
-        #### Fail upper and lower limits
-        - Upper limit: distance to water is less than whatever the minimum sensing range is  
-        - Lower limit: either hard bottom (if it’s a site that bottoms out at LW, or if we have a depth measurement at the site), or distance to water = maximum of sensing range  
-                    
-        #### Notes  
-
-        Top recorded water levels, in ft MHHW (and year)  
-        - Gulf of Maine 
-            - Eastport: 5.07 (2020)  
-            - Bar Harbor: 4.43 (2024) 
-            - Portland: 4.67 (2024) 
-            - Boston: 4.89 (2018) 
-        - New England Shelf 
-            - Chatham, MA: 4.28 (2014)  
-            - Newport, RI: 9.45 (1938)
-            -New London, CT: 7.53 (1938) 
-
-        Lowest navd88_meters  
-        - Eastport: -3.46 ft MLLW  (this will have the largest variability)  
-        """)
+        st.markdown(region.gross_range_test_help)
 
     gross_col_1, gross_col_2 = st.columns([1, 3])
 
@@ -334,7 +93,8 @@ with st.expander("Gross range test", expanded=True):
 
         gross_suspect_upper_limit = st.number_input(
             "Upper limit",
-            value=mhhw + 6 * FEET_TO_METERS,
+            value=test_defaults.gross_range.suspect_upper_limit,
+            key="gross_suspect_upper_limit",
             help="""
             The upper limit of the gross range test.
             """,
@@ -342,7 +102,8 @@ with st.expander("Gross range test", expanded=True):
 
         gross_suspect_lower_limit = st.number_input(
             "Lower limit",
-            value=mllw - 4.5 * FEET_TO_METERS,
+            value=test_defaults.gross_range.suspect_lower_limit,
+            key="gross_suspect_lower_limit",
             help="""
             The lower limit of the gross range test.
             """,
@@ -352,7 +113,8 @@ with st.expander("Gross range test", expanded=True):
 
         gross_fail_upper_limit = st.number_input(
             "Upper limit",
-            # value=0,
+            value=test_defaults.gross_range.fail_upper_limit,
+            key="gross_fail_upper_limit",
             help="""
             The upper limit of the gross range test.
             """,
@@ -360,7 +122,8 @@ with st.expander("Gross range test", expanded=True):
 
         gross_fail_lower_limit = st.number_input(
             "Lower limit",
-            # value=0,
+            value=test_defaults.gross_range.fail_lower_limit,
+            key="gross_fail_lower_limit",
             help="""
             The lower limit of the gross range test.
             """,
@@ -384,7 +147,7 @@ with st.expander("Gross range test", expanded=True):
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": gross_range_test_config,
                         }
                     }
@@ -395,6 +158,7 @@ with st.expander("Gross range test", expanded=True):
                 gross_df,
                 "gross_range_test",
                 title="Gross range test",
+                var_name=column,
             )
             st.bokeh_chart(plot, use_container_width=True)
 
@@ -403,23 +167,14 @@ with st.expander("Gross range test", expanded=True):
 
 with st.expander("Rate of change test", expanded=True):
     with st.popover("Test configuration suggestions"):
-        st.markdown("""
-### Rate of change test. Input as a rate.  
-
-- Suspect: 0.75 feet per 6 minutes  
-- Fail: 1 foot per 6 minutes  
-
-Rationale: max rate of change from tides in Eastport is 5.3 ft per hour (midtide on 1/13/2024), or ~0.5 ft per 6 minutes. Add 0.25 feet for a sustained wind-driven increase in water level.  
-
-May want to adjust this so it’s dependent on tidal range  
-                    """)
+        st.markdown(region.rate_of_change_test_help)
 
     rate_col_1, rate_col_2 = st.columns([1, 3])
 
     with rate_col_1:
         rate_threshold = st.number_input(
             "Rate threshold",
-            value=0.75 * FEET_TO_METERS,
+            value=test_defaults.rate_of_change.rate_threshold,
             format="%.3f",
             help="""
             The rate of change threshold for the rate of change test.
@@ -442,7 +197,7 @@ May want to adjust this so it’s dependent on tidal range
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": rate_of_change_test_config,
                         }
                     }
@@ -461,23 +216,19 @@ May want to adjust this so it’s dependent on tidal range
 
 with st.expander("Spike test", expanded=True):
     with st.popover("Test configuration suggestions"):
-        st.markdown("""
-### Spike test: Input as a magnitude that’s checked across a measurement and the two adjacent measurements.  
-
-Maybe default to same as rate of change test? 
-                    """)
+        st.markdown(region.spike_test_help)
 
     spike_col_1, spike_col_2 = st.columns([1, 3])
 
     with spike_col_1:
         spike_suspect_threshold = st.number_input(
             "Suspect threshold",
-            value=0.75 * FEET_TO_METERS,
+            value=test_defaults.spike.suspect_threshold,
             format="%.3f",
         )
         spike_fail_threshold = st.number_input(
             "Fail threshold",
-            value=1.5 * FEET_TO_METERS,
+            value=test_defaults.spike.fail_threshold,
             format="%.3f",
         )
         spike_test_toggle = st.toggle("Enable Spike test", value=True)
@@ -498,7 +249,7 @@ Maybe default to same as rate of change test?
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": spike_test_config,
                         }
                     }
@@ -517,37 +268,24 @@ Maybe default to same as rate of change test?
 
 with st.expander("Flat line test", expanded=True):
     with st.popover("Test configuration suggestions"):
-        st.markdown("""
-### Flat line test: If there’s some lack of variance over some amount of time, mark as suspect/fail 
-
-Suspect/Fail = how long do subsequent values stay within that threshold before it’s considered flat? (input as a time) 
-
-For example, if all measurements over the past 4 hours are within 10 cm of each other, fail the flatline test (then tolerance = 10 cm, and time = 4 hours) 
-
-When a sensor flatlines, the system voltage and temperature sensor may still be causing variation 
-
-Let’s start with 0.1 feet over 2 hours for suspect, and 0.1 feet over 3 hours for fail.  
-
-
-Rationale: During neap tides in Portland, you could see as little as +/- 0.25 ft per hour of variation in the 2 hours around slack tide (HW or LW)  
-                    """)
+        st.markdown(region.flat_line_test_help)
 
     flat_line_col_1, flat_line_col_2 = st.columns([1, 3])
 
     with flat_line_col_1:
         flat_line_tolerance = st.number_input(
             "Tolerance (meters)",
-            value=0.1 * FEET_TO_METERS,
+            value=test_defaults.flat_line.tolerance,
             format="%.3f",
             help="How little change is considered flat?",
         )
         flat_line_suspect_threshold = st.number_input(
             "Suspect threshold (seconds)",
-            value=2 * 60 * 60,
+            value=test_defaults.flat_line.suspect_threshold,
         )
         flat_line_fail_threshold = st.number_input(
             "Fail threshold (seconds)",
-            value=3 * 60 * 60,
+            value=test_defaults.flat_line.fail_threshold,
         )
         flat_line_test_toggle = st.toggle("Enable Flat line test", value=True)
     with flat_line_col_2:
@@ -567,7 +305,7 @@ Rationale: During neap tides in Portland, you could see as little as +/- 0.25 ft
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": flat_line_test_config,
                         }
                     }
@@ -588,7 +326,7 @@ with st.expander("Aggregated results", expanded=True):
         data,
         qc_helpers.Config(
             {
-                "navd88_meters": {
+                column: {
                     "qartod": qartod,
                 }
             }
@@ -638,7 +376,7 @@ with st.expander("Configuration", expanded=True):
 
     config.update({
         "datums": {"manual_datums": datums},
-        "qc": {"qartod": {"contexts": [{"streams": {"navd88_meters": {"qartod": qartod}}}]}},
+        "qc": {"qartod": {"contexts": [{"streams": {column: {"qartod": qartod}}}]}},
     })
 
     if title := st.text_input("Station title", help="For display in ERDDAP, Mariners, and other locations, such as 'Department of Marine Resources, Boothbay Harbor, ME Hohonu tide gauge'"):
@@ -661,7 +399,7 @@ with st.expander("Configuration", expanded=True):
         import yaml
         config_yaml = yaml.dump(config)
         st.download_button(
-            "Download station config", config_yaml, file_name=f"{station_id}.yaml"
+            "Download station config", config_yaml, file_name="config.yaml"
         )
         st.code(config_yaml, language="yaml")
     except ImportError:
@@ -669,6 +407,6 @@ with st.expander("Configuration", expanded=True):
         import json
         config_json = json.dumps(config)
         st.download_button(
-            "Download station config", config_json, file_name=f"{station_id}.json"
+            "Download station config", config_json, file_name="config.json"
         )
         st.code(config_json, language="json")

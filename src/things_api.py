@@ -127,3 +127,87 @@ def generate_time_periods(start_date: date, end_date: date):
         # print((current_date, next_date))
         yield (current_date, next_date)
         current_date = next_date
+
+
+def load_things_streamlit_data_and_config():
+    import streamlit as st
+
+    config = {}
+
+    try:
+        api_key = st.secrets["THINGS_API_KEY"]
+    except KeyError:
+        api_key = st.text_input(
+            "Things network API key",
+            type="password",
+            help="""
+        Please enter your Things Network API key. It can be retrieved from
+        API Keys which is avaliable underneath the Applications tab of the dashboard.
+        """
+        )
+
+    if api_key is None or api_key == "":
+        st.error("No The Things Network API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box.")
+        st.stop()
+
+    api = ThingsApi(api_key=api_key, account_id="neracoos", application_id="providence-wl", region="nam1")
+
+    @st.cache_data
+    def fetch_data(device_id: str, start_date: date, end_date: date, navd88_elevation_meters: float,):
+        """Load device info from The Things Network"""
+        df = api.fetch_data(device_id, start_date, end_date, navd88_elevation_meters)
+        return df
+
+
+    with st.sidebar:
+        with st.expander("Station selector", expanded=True):
+            station_id = st.text_input(
+                "Things device ID",
+                # value="brown-wl-012",
+                help="""
+                The ID of the device in The Things Network console.
+                """
+            )
+
+            if station_id == "":
+                st.warning(
+                    "Please enter a device ID. It can be found in The Things Network console."
+                )
+                st.stop()
+
+            latitude = st.number_input("Station Latitude (decimal degrees)")
+            longitude = st.number_input("Station longitude (decimal degrees)")
+            navd88_elevation_meters = st.number_input("Elevation of station above navd88_meters")
+            install_date = st.date_input("Install date")
+
+            config.update({
+                "device_id": station_id,
+                "latitude": latitude,
+                "longitude": longitude,
+                "navd88_elevation_meters": navd88_elevation_meters,
+                "start_date": install_date.isoformat(),
+            })
+
+    with st.sidebar:
+        with st.expander("Data selector", expanded=True):
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+            month_ago = now - timedelta(days=30)
+
+            date_range = st.date_input(
+                "Date range",
+                (week_ago, now),
+                max_value=now,
+                min_value=month_ago,
+                help="Date range to load testing data for (up to a max of a month ago)"
+            )
+
+            load_data_button = st.toggle("Load data")
+    
+    if not load_data_button:
+        st.warning("Please select a date range and toggle 'Load data' to start generating QARTOD config")
+        st.stop()
+
+    data = fetch_data(station_id, date_range[0], date_range[1], navd88_elevation_meters)
+
+    return data, config
