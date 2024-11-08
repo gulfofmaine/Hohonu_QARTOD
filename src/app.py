@@ -26,9 +26,8 @@ with st.sidebar:
     data_source = st.selectbox("Select data source", DATA_SOURCES)
 
 
-config = {}
 qartod = {}
-
+column = "navd88_meters"
 if data_source == HOHONU_DATA_SOURCE:
     from hohonu_api import load_hohonu_streamlit_data_and_config
 
@@ -39,13 +38,18 @@ elif data_source == BROWN_DATA_SOURCE:
 
     data, config = load_things_streamlit_data_and_config()
 
+
+elif data_source == ERDDAP:
+    from erddap import load_erddap_data_and_config
+
+    data, config, column = load_erddap_data_and_config()
 else:
     st.error("No idea how you selected another data source, exploding now")
     st.stop()
 
 with st.expander("Loaded data"):
     st.dataframe(data)
-    st.line_chart(data, x="time", y="navd88_meters", y_label="navd88_meters (m)")
+    st.line_chart(data, x="time", y=column, y_label=column)
 
 with st.sidebar:
     with st.expander("Datum selector", expanded=True):
@@ -143,7 +147,7 @@ with st.expander("Gross range test", expanded=True):
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": gross_range_test_config,
                         }
                     }
@@ -154,6 +158,7 @@ with st.expander("Gross range test", expanded=True):
                 gross_df,
                 "gross_range_test",
                 title="Gross range test",
+                var_name=column,
             )
             st.bokeh_chart(plot, use_container_width=True)
 
@@ -192,7 +197,7 @@ with st.expander("Rate of change test", expanded=True):
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": rate_of_change_test_config,
                         }
                     }
@@ -244,7 +249,7 @@ with st.expander("Spike test", expanded=True):
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": spike_test_config,
                         }
                     }
@@ -300,7 +305,7 @@ with st.expander("Flat line test", expanded=True):
                 data,
                 qc_helpers.Config(
                     {
-                        "navd88_meters": {
+                        column: {
                             "qartod": flat_line_test_config,
                         }
                     }
@@ -321,7 +326,7 @@ with st.expander("Aggregated results", expanded=True):
         data,
         qc_helpers.Config(
             {
-                "navd88_meters": {
+                column: {
                     "qartod": qartod,
                 }
             }
@@ -371,7 +376,7 @@ with st.expander("Configuration", expanded=True):
 
     config.update({
         "datums": {"manual_datums": datums},
-        "qc": {"qartod": {"contexts": [{"streams": {"navd88_meters": {"qartod": qartod}}}]}},
+        "qc": {"qartod": {"contexts": [{"streams": {column: {"qartod": qartod}}}]}},
     })
 
     if title := st.text_input("Station title", help="For display in ERDDAP, Mariners, and other locations, such as 'Department of Marine Resources, Boothbay Harbor, ME Hohonu tide gauge'"):

@@ -28,9 +28,21 @@ def plot_results(
 
     time = data["time"]
     obs = data[var_name]
-    qc_test = data[f"{var_name}_qartod_{test_name}"]
-
-    qc_pass = np.ma.masked_where(qc_test != 1, obs)
+    qc_test_column = f"{var_name}_qartod_{test_name}"
+    try:
+        qc_test = data[qc_test_column]
+    except KeyError as e:
+        raise KeyError(
+            f"{qc_test_column} is not in the dataframe. {data.columns}"
+        ) from e
+    
+    try:
+        qc_pass = np.ma.masked_where(qc_test != 1, obs)
+    except IndexError as e:
+        raise IndexError(
+            f"{qc_test=}, {obs=}"
+        ) from e
+    
     qc_suspect = np.ma.masked_where(qc_test != 3, obs)
     qc_fail = np.ma.masked_where(qc_test != 4, obs)
     qc_notrun = np.ma.masked_where(qc_test != 2, obs)
