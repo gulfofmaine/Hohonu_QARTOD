@@ -161,8 +161,8 @@ class StationInfo(BaseModel):
     d2w_begin_caution: Optional[float] = None
     d2w_begin_emergency: Optional[float] = None
     decommissioned_date: Optional[str] = None
-    distance: Distance
-    download_permision: bool
+    distance: Optional[Distance] = None
+    download_permision: Optional[bool] = None
     id: str
     images: Optional[list[str]] = None
     installation_date: Optional[datetime] = None
@@ -174,7 +174,7 @@ class StationInfo(BaseModel):
     mllw: Optional[float] = None
     mllw_begin_caution: Optional[float] = None
     mllw_begin_emergency: Optional[float] = None
-    navd88: float
+    navd88: Optional[float] = None
     navd88_begin_caution: Optional[float] = None
     navd88_begin_emergency: Optional[float] = None
     nearest_noaa_subordinate_observed: Optional[str] = None
@@ -184,12 +184,12 @@ class StationInfo(BaseModel):
     sensor: Optional[str] = None
     station_id: Optional[str] = None
     station_identifier: Optional[str] = None
-    station_type: str
-    status: str
+    station_type: Optional[str] = None
+    status: Optional[str] = None
     subscribed: Subscribed | bool = False
-    tidal: bool
-    uuid: str
-    water: bool
+    tidal: Optional[bool] = None
+    uuid: Optional[str] = None
+    water: Optional[bool] = None
 
 
 def load_hohonu_streamlit_data_and_config():
