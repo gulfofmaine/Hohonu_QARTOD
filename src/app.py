@@ -13,6 +13,8 @@ st.markdown("""
 
 This tool is to help generate QARTOD configuration files
 for Hohonu, Brown/URI, and other water level gauges deployed for NERACOOS. 
+            
+See the [QARTOD manuals](https://ioos.noaa.gov/project/qartod/) for more details.
 """)
 
 st.markdown(region.general_info)

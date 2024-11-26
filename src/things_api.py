@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta, time
 import os
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import requests
 
 
@@ -74,8 +74,11 @@ class ThingsApi(BaseModel):
             dfs.append(df)
 
         df = pd.concat(dfs, ignore_index=True)
-
-        df["time"] = df["recieved_at"]
+        try:
+            df["time"] = df["recieved_at"]
+        except KeyError as e:
+            msg = f"KeyError parsing dataframe {df}"
+            raise KeyError(msg) from e
         df["navd88_meters"] = navd88_elevation_meters - (df["distance"] / 1_000)
 
         return df
@@ -115,7 +118,11 @@ class Data(BaseModel):
     def lines_to_dicts(cls, text: str):
         for line in text.splitlines():
             if line != "":
-                yield cls.model_validate_json(line).flatten()
+                try:
+                    yield cls.model_validate_json(line).flatten()
+                except ValidationError as e:
+                    print(line)
+                    print(e)
 
 def generate_time_periods(start_date: date, end_date: date):
     """Generate a list of time periods to fetch data for"""
