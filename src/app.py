@@ -324,24 +324,28 @@ with st.expander("Flat line test", expanded=True):
 
 
 with st.expander("Aggregated results", expanded=True):
-    all_df = qc_helpers.run_qc(
-        data,
-        qc_helpers.Config(
-            {
-                column: {
-                    "qartod": qartod,
+    try:
+        all_df = qc_helpers.run_qc(
+            data,
+            qc_helpers.Config(
+                {
+                    column: {
+                        "qartod": qartod,
+                    }
                 }
-            }
-        ),
-    )
-    plot = qc_helpers.plot_aggregate(
-        all_df,
-    )
-    st.bokeh_chart(plot, use_container_width=True)
+            ),
+        )
+        plot = qc_helpers.plot_aggregate(
+            all_df,
+        )
+        st.bokeh_chart(plot, use_container_width=True)
 
-    with st.popover("Tabular results and raw test config"):
-        st.write(qartod)
-        st.dataframe(all_df)
+        with st.popover("Tabular results and raw test config"):
+            st.write(qartod)
+            st.dataframe(all_df)
+    except IndexError:
+        st.warning("No QARTOD tests configured.")
+
 with st.expander("Configuration", expanded=True):
     st.markdown("### NERACOOS Sea-Eagle config")
 
