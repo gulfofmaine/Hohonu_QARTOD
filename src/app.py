@@ -233,6 +233,12 @@ with st.expander("Spike test", expanded=True):
             value=test_defaults.spike.fail_threshold,
             format="%.3f",
         )
+        spike_differential_method = st.checkbox(
+            "Use differential method rather than average",
+            help="""
+            See [this issue](https://github.com/ioos/ioos_qc/issues/48) for more info.
+            """
+        )
         spike_test_toggle = st.toggle("Enable Spike test", value=True)
 
     with spike_col_2:
@@ -245,6 +251,8 @@ with st.expander("Spike test", expanded=True):
                     "fail_threshold": spike_fail_threshold,
                 }
             }
+            if spike_differential_method:
+                spike_test_config["spike_test"]["method"] = "differential"
             qartod.update(spike_test_config)
 
             spike_df = qc_helpers.run_qc(
