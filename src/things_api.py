@@ -157,7 +157,10 @@ def load_things_streamlit_data_and_config():
         st.error("No The Things Network API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box.")
         st.stop()
 
-    api = ThingsApi(api_key=api_key, account_id="neracoos", application_id="providence-wl", region="nam1")
+    with st.sidebar:
+        application_id = st.text_input("Things Network application ID", value="providence-wl")
+
+    api = ThingsApi(api_key=api_key, account_id="neracoos", application_id=application_id, region="nam1")
 
     @st.cache_data
     def fetch_data(device_id: str, start_date: date, end_date: date, navd88_elevation_meters: float,):
