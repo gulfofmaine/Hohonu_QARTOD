@@ -157,8 +157,23 @@ def load_things_streamlit_data_and_config():
         st.error("No The Things Network API key found. Please add to [.streamlit/secrets.toml](https://docs.streamlit.io/develop/concepts/connections/secrets-management), environment variables, or enter in the input box.")
         st.stop()
 
+    application_id = "providence-wl"
+
     with st.sidebar:
-        application_id = st.text_input("Things Network application ID", value="providence-wl")
+        if st.checkbox("Change application"):
+            application_id = st.text_input(
+                "Things Network application ID", 
+                value="providence-wl",
+                )
+            api_key = st.text_input(
+                "Things network API key",
+                type="password",
+                help="""
+            Please enter your Things Network API key. It can be retrieved from
+            API Keys which is avaliable underneath the Applications tab of the dashboard.
+            """
+            )
+            
 
     api = ThingsApi(api_key=api_key, account_id="neracoos", application_id=application_id, region="nam1")
 
