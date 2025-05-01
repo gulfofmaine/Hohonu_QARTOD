@@ -164,7 +164,7 @@ class StationInfo(BaseModel):
     distance: Optional[Distance] = None
     download_permision: Optional[bool] = None
     id: str
-    images: Optional[list[str]] = None
+    # images: Optional[list[str]] = None
     installation_date: Optional[datetime] = None
     latitude: float
     local_mllw: Optional[float] = None
