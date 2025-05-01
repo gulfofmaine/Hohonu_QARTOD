@@ -8,10 +8,11 @@ platforms = ["osx-arm64"]
 start = "streamlit run src/app.py"
 
 [dependencies]
-streamlit = ">=1.37.1,<1.38"
-pydantic = ">=2.8.2,<2.9"
-ioos_qc = ">=2.1.0,<2.2"
-pandas = ">=2.2.2,<2.3"
-bokeh = "<3"
-pyyaml = ">=6.0.2,<6.1"
-erddapy = ">=2.2.3,<3"
+streamlit = ">=1.45.0,<2"
+pydantic = ">=2.11.3,<3"
+ioos_qc = ">=2.2.0,<3"
+pandas = ">=2.2.3,<3"
+bokeh = "<=2.4.3"
+pyyaml = ">=6.0.2,<7"
+erddapy = ">=2.2.4,<3"
+numpy = "<2"
