@@ -21,8 +21,9 @@ st.markdown(region.general_info)
 
 HOHONU_DATA_SOURCE = "Hohonu"
 BROWN_DATA_SOURCE = "Brown/URI"
+GREENSTREAM = "GreenStream"
 ERDDAP = "ERDDAP"
-DATA_SOURCES = [HOHONU_DATA_SOURCE, BROWN_DATA_SOURCE, ERDDAP]
+DATA_SOURCES = [HOHONU_DATA_SOURCE, BROWN_DATA_SOURCE, GREENSTREAM, ERDDAP]
 
 with st.sidebar:
     data_source = st.selectbox("Select data source", DATA_SOURCES)
@@ -40,6 +41,12 @@ elif data_source == BROWN_DATA_SOURCE:
 
     data, config = load_things_streamlit_data_and_config()
 
+
+elif data_source == GREENSTREAM:
+    from greenstream_api import load_greenstream_data_and_config
+
+    data, config = load_greenstream_data_and_config()
+    # column = "navd88_meters"
 
 elif data_source == ERDDAP:
     from erddap import load_erddap_data_and_config
@@ -407,7 +414,7 @@ with st.expander("Configuration", expanded=True):
         ):
         config["summary"] = summary
 
-    st.markdown("Station configuration to provide to ODP")
+    st.markdown("Station configuration to provide to ODP via [Github](https://github.com/gulfofmaine/NERACOOS_Water_Level_Datasets/issues)")
 
     try:
         import yaml
