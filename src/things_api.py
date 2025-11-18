@@ -165,6 +165,7 @@ def load_things_streamlit_data_and_config():
                 "Things Network application ID", 
                 value="providence-wl",
                 )
+            config["application_id"] = application_id
             api_key = st.text_input(
                 "Things network API key",
                 type="password",
