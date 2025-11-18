@@ -54,7 +54,11 @@ class GreenstreamApi(BaseModel):
         url = f"https://api.greenstream.cloud/site/?id={station_id}"
         headers = self.headers()
         response = requests.get(url, headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            print(response.text)
+            raise e
 
         return StationInfo.model_validate_json(response.text)
 
@@ -77,14 +81,13 @@ class GreenstreamApi(BaseModel):
 
 
 def flatten_greenstream_message(d):
-    return {
-        "timestamp": pd.Timestamp.fromtimestamp(d["timestamp"]),
-        **d["senix"],
-        **d["ina219"],
-        **d["lte"],
-        "id": d["id"],
-        "device": d["device"]
-    }
+    try:
+        return {
+            "timestamp": pd.Timestamp.fromtimestamp(d["timestamp"]),
+            "NAVD88_ft": d["NAVD88"],
+        }
+    except KeyError as e:
+        raise KeyError(f"Error processing message: {d}") from e
 
 
 def load_greenstream_data_and_config():
@@ -133,23 +136,33 @@ def load_greenstream_data_and_config():
             st.error("Please enter a valid Greenstream site ID.")
             st.stop()
 
-        station_info = load_station_info(station_id)
-        
-        # st.write(station_info)
+        try:
+            station_info = load_station_info(station_id)
 
-        st.markdown(f"""
-        ## {station_info.name}
+            st.markdown(f"""
+            ## {station_info.name}
 
-        - Latitude: {station_info.location.latitude}
-        - Longitude: {station_info.location.longitude}
-        - Install date: {station_info.createDate}
-        """)
-        config.update({
-            "site_id": station_id,
-            "latitude": station_info.location.latitude,
-            "longitude": station_info.location.longitude,
-            "start_date": station_info.createDate.isoformat(),
-        })
+            - Latitude: {station_info.location.latitude}
+            - Longitude: {station_info.location.longitude}
+            - Install date: {station_info.createDate}
+            """)
+            config.update({
+                "site_id": station_id,
+                "latitude": station_info.location.latitude,
+                "longitude": station_info.location.longitude,
+                "start_date": station_info.createDate.isoformat(),
+            })
+        except requests.HTTPError:
+            st.error("Error loading station info, please enter it manually.")
+            latitude = st.number_input("Station Latitude (decimal degrees)")
+            longitude = st.number_input("Station longitude (decimal degrees)")
+            install_date = st.date_input("Install date")
+            config.update({
+                "site_id": station_id,
+                "latitude": latitude,
+                "longitude": longitude,
+                "start_date": install_date.isoformat(),
+            })
     
         with st.expander("Data selector", expanded=True):
             now = datetime.now()
@@ -159,23 +172,12 @@ def load_greenstream_data_and_config():
                 "Date range",
                 (week_ago, now),
                 max_value=now,
-                min_value=station_info.createDate,
                 help="Date range to load testing data for."
             )
 
             too_long = date_range[1] - date_range[0] > timedelta(days=30)
             if too_long:
                 st.warning("Please select a data range of less than 30 days.")
-
-            navd88_elevation_meters = st.number_input(
-                "Elevation of station above NAVD88 (meters)",
-                value=0,
-                help="Elevation of the station above NAVD88 in meters."
-            )
-
-            config.update({
-                "navd88_elevation_meters": navd88_elevation_meters,
-            })
 
             load_data_button = st.toggle("Load data", disabled=too_long)
 
@@ -184,6 +186,6 @@ def load_greenstream_data_and_config():
         st.stop()
 
     data = load_data(station_id, date_range[0], date_range[1])
-    data["navd88_meters"] = navd88_elevation_meters - (data["mm"] / 1_000)
+    data["navd88_meters"] = (data["NAVD88_ft"] * 0.3048)
 
     return data, config
